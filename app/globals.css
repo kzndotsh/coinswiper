@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-track-[#1A181C]::-webkit-scrollbar-track {
+    background: #1a181c;
+  }
+
+  .scrollbar-thumb-[#2A272E]::-webkit-scrollbar-thumb {
+    background: #2a272e;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #1a181c;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2a272e;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a383c;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+    width: 0;
+    height: 0;
+  }
+}
+
+@keyframes slide-left {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-left {
+  animation: slide-left 0.5s ease-out;
+}
+
+.transition-transform {
+  transition: transform 60s linear;
+}
+
+/* Remove or comment out these keyframes as they're no longer needed
+@keyframes slide-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-right {
+  animation: slide-right 30s linear infinite;
+}
+*/
+
+.bullish-vote-animation {
+  transition: background-color 500ms, border-color 500ms;
+}
+
+.bullish-vote-animation.active {
+  background-color: #1f2210;
+  border-color: #d9ff00;
+}
+
