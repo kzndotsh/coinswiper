@@ -76,7 +76,7 @@ yarn start
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **Database ORM**: [Prisma](https://www.prisma.io/)
 - **API Integration**: [DexScreener SDK](https://docs.dexscreener.com/)
-- **UI Components**: Shadcn UI components with Lucide React icons
+- **UI Components**: [Shadcn UI](https://ui.shadcn.com/) with [Lucide React](https://lucide.dev/) icons
 
 ## 📁 Project Structure
 
