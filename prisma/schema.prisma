@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  output          = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CryptoCurrency {
+  id                String   @id @default(uuid())
+  pairAddress       String   @unique // DEX pair address
+  baseTokenAddress  String // Solana token mint address
+  baseTokenName     String
+  baseTokenSymbol   String
+  quoteTokenAddress String // Usually USDC, USDT, or SOL mint address
+  quoteTokenName    String
+  quoteTokenSymbol  String
+  dexId             String // e.g., "raydium", "orca"
+  priceUsd          String // Stored as string to preserve precision
+  priceSOL          String // Price in SOL, stored as string
+  liquidity         Float // Total liquidity in USD
+  volume24h         Float // 24h volume in USD
+  marketCap         Float    @default(0)
+  fdv               Float    @default(0) // Fully diluted valuation
+  priceChange24h    Float    @default(0) // 24h price change percentage
+  txnCount24h       Int      @default(0) // Number of transactions in 24h
+  tradingViewUrl    String
+  dexScreenerUrl    String
+  imageUrl          String?
+  bullishVotes      Int      @default(0)
+  bearishVotes      Int      @default(0)
+  bullishPercentage Float    @default(50)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([baseTokenAddress])
+  @@index([pairAddress])
+  @@index([quoteTokenAddress])
+}
+
+enum VoteType {
+  BULLISH
+  BEARISH
+}
