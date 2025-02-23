@@ -2,16 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-rgb: 8, 7, 9;
+}
+
+html,
+body {
+  background: rgb(var(--background-rgb));
+  color: rgb(var(--foreground-rgb));
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
   }
 
-  .scrollbar-track-[#1A181C]::-webkit-scrollbar-track {
+  .scrollbar-track-dark::-webkit-scrollbar-track {
     background: #1a181c;
   }
 
-  .scrollbar-thumb-[#2A272E]::-webkit-scrollbar-thumb {
+  .scrollbar-thumb-dark::-webkit-scrollbar-thumb {
     background: #2a272e;
     border-radius: 9999px;
   }
@@ -35,12 +50,15 @@
   }
 
   .no-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
   }
 
   .no-scrollbar::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
+    display: none;
+    /* Chrome, Safari and Opera */
     width: 0;
     height: 0;
   }
@@ -50,6 +68,7 @@
   0% {
     transform: translateX(100%);
   }
+
   100% {
     transform: translateX(0);
   }
@@ -86,4 +105,3 @@
   background-color: #1f2210;
   border-color: #d9ff00;
 }
-
