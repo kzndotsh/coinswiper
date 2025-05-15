@@ -58,9 +58,9 @@ const nextConfig = {
   logging: {
     level: 'info',
     fullUrl: true,
-    fetches: {
-      hmrRefreshes: true,
-    },
+    // fetches: {
+    //   hmrRefreshes: true,
+    // },
   },
   experimental: {
     optimizeCss: true,
