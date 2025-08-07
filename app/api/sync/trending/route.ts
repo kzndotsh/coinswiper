@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { dexscreener } from "@/lib/dexscreener";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
-import { ExtendedPair } from "@/types/dexscreener";
+import type { ExtendedPair } from "@/types/dexscreener";
 import {
   SOLANA_DEXES,
   VALIDATION_THRESHOLDS,
-  ValidationResult,
+  type ValidationResult,
   isSuspiciousToken,
   calculatePairScore,
   DEX_CONFIG,
@@ -15,14 +15,27 @@ import {
 
 export async function POST() {
   try {
-    console.log("Starting sync process...");
+    console.log("[DEBUG] Starting sync process...");
     
+    const hardcodedAddresses = [
+      "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+      "H1aoUqmp2vJu5o8w3o8LjrN6jKyWErS69PtYxGhfoXxf",
+      "ENfpbQUM5xAnNP8ecyEQGFJ6KwbuPjMwv7ZjR29cDuAb",
+      "8V6pDEmXV3iKC3nVjDUeDqMPBrTq8y69EovCxTokyyFd",
+      "fRfKGCriduzDwSudCwpL7ySCEiboNuryhZDVJtr1a1C",
+      "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
+      "38PgzpJYu2HkiYvV8qePFakB8tuobPdGm2FFEn7Dpump",
+      "GkyPYa7NnCFbduLknCfBfP7p8564X1VZhwZYJ6CZpump",
+      "FtUEW73K6vEYHfbkfpdBZfWpxgQar2HipGdbutEhpump",
+      "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
+    ];
+
     // Test database connection
     let count = 0;
     try {
       count = await db.cryptoCurrency.count();
       console.log(`Current number of tokens in database: ${count}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Database connection test failed:", error);
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         console.error("Known Prisma error:", {
@@ -46,6 +59,14 @@ export async function POST() {
     console.log("Fetching trending pairs...");
     const allPairs: ExtendedPair[] = [];
     
+    // Fetch pairs using hardcoded addresses
+    console.log("Fetching pairs from hardcoded list...");
+    const hardcodedPairs = await dexscreener.getPairsByTokenAddresses(hardcodedAddresses);
+    console.log(`Found ${hardcodedPairs.length} pairs from hardcoded list`);
+    allPairs.push(...hardcodedPairs);
+
+    // Comment out or remove other fetching methods if only hardcoded list is needed
+    /*
     // Get trending pairs by volume
     console.log("Fetching trending pairs from Solana...");
     const trendingPairs = await dexscreener.getTrendingPairs();
@@ -65,6 +86,7 @@ export async function POST() {
       console.log(`Found ${dexPairs.length} pairs on ${dex}`);
       allPairs.push(...dexPairs);
     }
+    */
 
     // Get token boosts to prioritize promoted tokens
     const boostedTokens = await dexscreener.getTokenBoosts();
@@ -142,13 +164,7 @@ export async function POST() {
         pair,
         isValid: validation.isValid,
         creationDate: new Date(validation.createdAt),
-        score: calculatePairScore({
-          volume24h: Number(pair.volume?.h24 || 0),
-          liquidityUsd: Number(pair.liquidity?.usd || 0),
-          txCount24h: Number((pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0)),
-          priceChange24h: Number(pair.priceChange?.h24 || 0),
-          isBoosted: validation.isTokenBoosted
-        })
+        score: calculatePairScore(pair, boostedAddresses.has(pair.baseToken.address))
       };
     });
 
@@ -183,6 +199,15 @@ export async function POST() {
           // Get token profile if available
           const tokenProfile = await dexscreener.getTokenProfile(pair.baseToken.address);
           
+          const isBoosted = boostedAddresses.has(pair.baseToken.address);
+          const score = calculatePairScore({
+            volume24h: Number(pair.volume?.h24 || 0),
+            liquidityUsd: Number(pair.liquidity?.usd || 0),
+            txCount24h: Number((pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0)),
+            priceChange24h: Number(pair.priceChange?.h24 || 0),
+            isBoosted: isBoosted,
+          });
+
           // Convert numeric values to match database schema types
           const data = {
             pairAddress: pair.pairAddress,
@@ -211,6 +236,7 @@ export async function POST() {
             bullishVotes: 0,
             bearishVotes: 0,
             bullishPercentage: 50,
+            score: score
           };
 
           return await db.cryptoCurrency.upsert({
@@ -218,15 +244,25 @@ export async function POST() {
             create: data,
             update: data,
           });
-        } catch (error) {
-          console.error(`Failed to upsert pair ${pair.pairAddress}:`, error);
+        } catch (error: any) {
+          // Log specific error details for Prisma errors
+          if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            console.error(`Prisma error upserting pair ${pair.pairAddress}:`, {
+              code: error.code,
+              message: error.message,
+              meta: error.meta,
+              clientVersion: error.clientVersion,
+            });
+          } else {
+            console.error(`Failed to upsert pair ${pair.pairAddress}:`, error);
+          }
           return null;
         }
       })
     );
 
     const successfulUpserts = upsertResults.filter(Boolean);
-    console.log(`Successfully stored ${successfulUpserts.length} pairs in database`);
+    console.log(`[DEBUG] Successfully stored ${successfulUpserts.length} pairs in database`);
 
     // Sort pairs by volume for the response
     const sortedResponsePairs = [...validPairs].sort((a, b) => 
@@ -250,10 +286,17 @@ export async function POST() {
         liquidity: pair.liquidity?.usd || 0,
         priceUsd: pair.priceUsd || "0",
         priceChange24h: pair.priceChange?.h24 || 0,
-        isBoosted: boostedAddresses.has(pair.baseToken.address)
+        isBoosted: boostedAddresses.has(pair.baseToken.address),
+        score: calculatePairScore({
+          volume24h: Number(pair.volume?.h24 || 0),
+          liquidityUsd: Number(pair.liquidity?.usd || 0),
+          txCount24h: Number((pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0)),
+          priceChange24h: Number(pair.priceChange?.h24 || 0),
+          isBoosted: boostedAddresses.has(pair.baseToken.address),
+        })
       })),
     }, { headers });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Trending sync error:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       console.error("Known Prisma error:", {
@@ -266,13 +309,9 @@ export async function POST() {
       console.error("Validation error:", error.message);
       return new NextResponse(`Validation error: ${error.message}`, { status: 400 });
     } else if (error instanceof Error) {
-      console.error("Error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
+      console.error("General error:", error.message);
       return new NextResponse(`Error: ${error.message}`, { status: 500 });
     }
-    return new NextResponse("Internal error", { status: 500 });
+    return new NextResponse("Internal server error", { status: 500 });
   }
 } 

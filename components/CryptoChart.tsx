@@ -24,6 +24,8 @@ const ChartStyles = () => (
       bottom: 0;
       background: #1A181C;
       overflow: hidden;
+      margin: 0;
+      padding: 0;
     }
     .chart-container {
       position: absolute;
@@ -32,6 +34,8 @@ const ChartStyles = () => (
       right: 0;
       bottom: 0;
       overflow: hidden;
+      margin: 0;
+      padding: 0;
     }
     .chart-container iframe {
       position: absolute;
@@ -41,6 +45,9 @@ const ChartStyles = () => (
       left: 0;
       border: 0;
       background: #1A181C;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
   `}</style>
 );
@@ -149,6 +156,10 @@ const CryptoChart = memo(function CryptoChart({ pairAddress }: CryptoChartProps)
         will-change: transform;
         transform: translateZ(0);
         backface-visibility: hidden;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        display: block;
       `;
       iframe.allow = 'clipboard-write';
       iframe.title = 'DEX Chart';
@@ -204,21 +215,12 @@ const CryptoChart = memo(function CryptoChart({ pairAddress }: CryptoChartProps)
     <>
       <ChartStyles />
       <div id="chart-wrapper" className="chart-wrapper">
-        <div className="chart-container">
-          <iframe
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              background: '#1A181C'
-            }}
-            loading="lazy"
-            sandbox="allow-scripts allow-same-origin allow-popups"
-            src={buildEmbedUrl(pairAddress)}
-          />
+        <div ref={containerRef} className="chart-container">
+          {!isLoaded && isVisible && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#1A181C]">
+              <div className="text-[#4A484C] text-sm">Loading chart...</div>
+            </div>
+          )}
         </div>
       </div>
     </>

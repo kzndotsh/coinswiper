@@ -52,7 +52,7 @@ export function Leaderboard({
 
   return (
     <div
-      className="w-full bg-[#1A181C] border border-[#2A272E] overflow-hidden flex-grow flex flex-col"
+      className="w-full bg-[#1A181C] border border-[#2A272E] overflow-hidden grow flex flex-col"
       aria-label="Leaderboard"
     >
       {/* Header Tabs */}
@@ -72,7 +72,7 @@ export function Leaderboard({
       </div>
 
       {/* List */}
-      <div className="flex-grow px-2 pb-0 pt-2.5 overflow-y-auto no-scrollbar">
+      <div className="grow px-2 pb-0 pt-2.5 overflow-y-auto no-scrollbar">
         <div className="space-y-[5px]">
           {sortedTokens.map((crypto, index) => (
             <LeaderboardItem

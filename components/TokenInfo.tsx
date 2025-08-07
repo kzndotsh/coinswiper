@@ -12,6 +12,7 @@ const SWIPE_TOKEN = {
 };
 
 export function TokenInfo() {
+  console.log("[DEBUG] TokenInfo component rendering")
   const [isCopied, setIsCopied] = useState(false);
 
   const onCopy = () => {
@@ -22,19 +23,19 @@ export function TokenInfo() {
 
   return (
     <div
-      className="w-full bg-[#1A181C] border border-[#2A272E] p-2.5 flex-shrink-0 space-y-2.5"
+      className="w-full bg-[#1A181C] border border-[#2A272E] p-2.5 shrink-0 space-y-2.5"
       aria-label="Coin Information"
     >
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className="h-12 w-12 bg-[#1A181C] rounded-full overflow-hidden flex-shrink-0">
+        <div className="h-12 w-12 bg-[#1A181C] rounded-full overflow-hidden shrink-0">
           <img
             src={SWIPE_TOKEN.logo}
             alt="Coinswiper logo"
             className="h-full w-full object-cover"
           />
         </div>
-        <div className="flex-grow min-w-0">
+        <div className="grow min-w-0">
           <div className="flex items-center gap-1">
             <span className="text-[#F5F5F5] font-bold">{SWIPE_TOKEN.name}</span>
             <span className="text-gray-400">${SWIPE_TOKEN.symbol}</span>

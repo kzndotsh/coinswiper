@@ -77,14 +77,14 @@ const ControlButtons = memo(({ onVote, onSkip, onRedo, canRedo }: Pick<TokenDeta
     <div className="flex gap-4">
       <button
         onClick={() => onVote(false)}
-        className="flex items-center justify-center gap-2 bg-[#FF1654] hover:bg-[#FF1654]/90 text-[#F5F5F5] px-12 py-3 rounded-full text-sm font-helvetica-bold transition-all duration-200 hover:scale-105 w-[30rem]"
+        className="flex items-center justify-center gap-2 bg-[#FF1654] hover:bg-[#FF1654]/90 text-[#F5F5F5] px-12 py-3 rounded-full text-sm font-helvetica-bold transition-all duration-200 hover:scale-105 w-120"
       >
         <ArrowDown className="h-6 w-6" />
         vote bearish
       </button>
       <button
         onClick={() => onVote(true)}
-        className="flex items-center justify-center gap-2 bg-[#D9FF00] hover:bg-[#D9FF00]/90 text-black px-12 py-3 rounded-full text-sm font-helvetica-bold transition-all duration-200 hover:scale-105 w-[30rem]"
+        className="flex items-center justify-center gap-2 bg-[#D9FF00] hover:bg-[#D9FF00]/90 text-black px-12 py-3 rounded-full text-sm font-helvetica-bold transition-all duration-200 hover:scale-105 w-120"
       >
         vote bullish
         <ArrowUpRight className="h-6 w-6" />
@@ -104,7 +104,7 @@ export const TokenDetails = memo(function TokenDetails({ crypto, onVote, onSkip,
   // Memoize the header content
   const headerContent = useMemo(() => (
     <div className="flex items-center gap-4">
-      <div className="h-10 w-10 bg-[#F5F5F5] rounded-full overflow-hidden flex-shrink-0">
+      <div className="h-10 w-10 bg-[#F5F5F5] rounded-full overflow-hidden shrink-0">
         <img
           src={crypto.logo || "/placeholder.svg"}
           alt={`${crypto.name} logo`}

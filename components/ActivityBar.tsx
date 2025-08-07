@@ -34,7 +34,7 @@ export function ActivityBar({ recentRatings }: ActivityBarProps) {
                 className={`animate-slide-left bg-[#131314] border border-[#2A272E] h-[52px] rounded-lg flex items-center py-1.5 pl-2 pr-1.5`}
               >
                 {/* Profile Picture */}
-                <div className="w-9 h-9 bg-[#1A181C] rounded-lg overflow-hidden relative flex-shrink-0">
+                <div className="w-9 h-9 bg-[#1A181C] rounded-lg overflow-hidden relative shrink-0">
                   <Image
                     src={imageUrl}
                     alt={`${crypto.name || 'Token'} logo`}
@@ -54,7 +54,7 @@ export function ActivityBar({ recentRatings }: ActivityBarProps) {
                 </div>
 
                 {/* Token Info */}
-                <div className="ml-2 flex-grow min-w-0">
+                <div className="ml-2 grow min-w-0">
                   <h3 className="text-[#F5F5F5] text-sm font-medium leading-tight truncate">{crypto.name}</h3>
                   <p className="text-gray-500 text-xs leading-tight truncate">{crypto.symbol}</p>
                 </div>
@@ -66,9 +66,9 @@ export function ActivityBar({ recentRatings }: ActivityBarProps) {
                   } font-helvetica-bold text-sm px-2 py-1 rounded-full ml-2`}
                 >
                   {isBullish ? (
-                    <ArrowUpRight className="h-4 w-4 flex-shrink-0" strokeWidth={2.3} />
+                    <ArrowUpRight className="h-4 w-4 shrink-0" strokeWidth={2.3} />
                   ) : (
-                    <ArrowDown className="h-4 w-4 flex-shrink-0" strokeWidth={2.3} />
+                    <ArrowDown className="h-4 w-4 shrink-0" strokeWidth={2.3} />
                   )}
                 </div>
               </div>

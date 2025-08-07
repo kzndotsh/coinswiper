@@ -7,6 +7,7 @@ const CACHE_MAX_AGE = VALIDATION_THRESHOLDS.CACHE.MAX_AGE;
 const CACHE_STALE = VALIDATION_THRESHOLDS.CACHE.STALE_WHILE_REVALIDATE;
 
 export async function GET(request: Request) {
+  console.log("[DEBUG] /api/tokens/trending called")
   try {
     const { searchParams } = new URL(request.url);
     const sortBy = searchParams.get("sortBy") || "volume24h";
@@ -14,22 +15,18 @@ export async function GET(request: Request) {
     const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 100);
     const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
     const offset = (page - 1) * limit;
-
-    // Calculate 24 hours ago
-    const twentyFourHoursAgo = new Date();
-    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+    console.log(`[DEBUG] Query params: sortBy=${sortBy}, sortOrder=${sortOrder}, limit=${limit}, page=${page}`);
 
     // Get total count and data in parallel
+    console.log(`[DEBUG] Querying DB with min liquidity: ${VALIDATION_THRESHOLDS.LIQUIDITY.MINIMAL}`)
     const [total, tokens] = await Promise.all([
       db.cryptoCurrency.count({
         where: {
-          createdAt: { gte: twentyFourHoursAgo },
           liquidity: { gte: VALIDATION_THRESHOLDS.LIQUIDITY.MINIMAL }
         }
       }),
       db.cryptoCurrency.findMany({
         where: {
-          createdAt: { gte: twentyFourHoursAgo },
           liquidity: { gte: VALIDATION_THRESHOLDS.LIQUIDITY.MINIMAL }
         },
         orderBy: {
@@ -64,6 +61,7 @@ export async function GET(request: Request) {
       })
     ]);
 
+    console.log(`[DEBUG] DB query results: total=${total}, tokens fetched=${tokens.length}`)
     const totalPages = Math.ceil(total / limit);
 
     // Add cache headers
@@ -83,12 +81,11 @@ export async function GET(request: Request) {
         hasPrevPage: page > 1,
       },
       debug: {
-        cutoffTime: twentyFourHoursAgo.toISOString(),
         filteredTokens: tokens.length,
       }
     }, { headers });
   } catch (error) {
-    console.error("Error fetching trending tokens:", error);
+    console.error("[DEBUG] Error fetching trending tokens:", error);
     return new NextResponse("Internal error", { status: 500 });
   }
 } 

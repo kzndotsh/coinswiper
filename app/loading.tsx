@@ -11,7 +11,7 @@ const TokenInfoSkeleton = () => (
 );
 
 const LeaderboardSkeleton = () => (
-  <div className="w-full bg-[#1A181C] border border-[#2A272E] flex-grow">
+  <div className="w-full bg-[#1A181C] border border-[#2A272E] grow">
     <div className="grid grid-cols-2">
       <div className="h-12 bg-[#1A181C] border-b border-[#2A272E]" />
       <div className="h-12 bg-[#131314] border-b border-[#2A272E]" />
@@ -66,8 +66,8 @@ const ChartSkeleton = () => (
     <div className="h-[80px] bg-[#1A181C] border-t border-[#2A272E] px-4 flex items-center justify-between">
       <div className="h-10 w-10 bg-[#2A272E] rounded-lg animate-pulse" />
       <div className="flex gap-4">
-        <div className="h-12 w-[30rem] bg-[#2A272E] rounded-full animate-pulse" />
-        <div className="h-12 w-[30rem] bg-[#2A272E] rounded-full animate-pulse" />
+        <div className="h-12 w-120 bg-[#2A272E] rounded-full animate-pulse" />
+        <div className="h-12 w-120 bg-[#2A272E] rounded-full animate-pulse" />
       </div>
       <div className="h-10 w-10 bg-[#2A272E] rounded-lg animate-pulse" />
     </div>
@@ -76,7 +76,7 @@ const ChartSkeleton = () => (
 
 export default function Loading() {
   return (
-    <div className="h-[100dvh] bg-[#080709] px-2.5 pb-1.25 flex flex-col space-y-2.5 pt-3.5 overflow-hidden font-mono">
+    <div className="h-dvh bg-[#080709] px-2.5 pb-1.25 flex flex-col space-y-2.5 pt-3.5 overflow-hidden font-mono">
       {/* Activity Bar */}
       <div className="w-full h-16 bg-[#1A181C] border border-[#2A272E] overflow-hidden">
         <div className="h-full flex items-center px-2.5">

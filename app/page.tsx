@@ -9,6 +9,7 @@ import { useTokenVoting } from "@/hooks/useTokenVoting"
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll"
 
 export default function Home() {
+  console.log("[DEBUG] Home component rendering")
   const [leaderboardView, setLeaderboardView] = useState<"bullish" | "bearish">("bullish")
   
   const {
@@ -28,6 +29,14 @@ export default function Home() {
     fetchTokens,
   } = useTokenVoting();
 
+  console.log("[DEBUG] Hook data:", { 
+    currentCrypto: currentCrypto?.name || "null", 
+    leaderboardLength: leaderboard?.length || 0,
+    isLoading,
+    hasMore,
+    page
+  })
+
   const observerRef = useInfiniteScroll({
     hasMore,
     isLoading: isLoadingMore,
@@ -37,10 +46,13 @@ export default function Home() {
     },
   });
 
-  if (!currentCrypto) return null;
+  if (!currentCrypto) {
+    console.log("[DEBUG] No currentCrypto, returning null - this causes blank page!")
+    return null;
+  }
 
   return (
-    <main className="h-[100dvh] bg-[#080709] flex flex-col overflow-hidden font-mono">
+    <main className="h-dvh bg-[#080709] flex flex-col overflow-hidden font-mono">
       <div className="px-2.5 pt-3.5 pb-2.5">
         <ActivityBar recentRatings={recentRatings} />
       </div>

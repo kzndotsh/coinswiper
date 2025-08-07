@@ -3,6 +3,7 @@ import type { CryptoCurrency } from "@/types";
 import { transformToken } from "@/lib/utils";
 
 export function useTokenVoting() {
+  console.log("[DEBUG] useTokenVoting hook initializing")
   const [tokens, setTokens] = useState<CryptoCurrency[]>([]);
   const [currentCrypto, setCurrentCrypto] = useState<CryptoCurrency | null>(null);
   const [leaderboard, setLeaderboard] = useState<CryptoCurrency[]>([]);
@@ -15,13 +16,17 @@ export function useTokenVoting() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const fetchTokens = useCallback(async (pageNum: number, isInitial = false) => {
+    console.log(`[DEBUG] fetchTokens called - page: ${pageNum}, isInitial: ${isInitial}`)
     try {
       setIsLoadingMore(!isInitial);
       const response = await fetch(`/api/tokens/trending?sortBy=volume24h&sortOrder=desc&limit=30&page=${pageNum}`);
+      console.log(`[DEBUG] API response status: ${response.status}`)
       if (!response.ok) throw new Error("Failed to fetch tokens");
       const data = await response.json();
+      console.log(`[DEBUG] API response data:`, data)
       
       const transformedTokens = data.data.map(transformToken);
+      console.log(`[DEBUG] Transformed ${transformedTokens.length} tokens`)
       
       if (transformedTokens.length > 0) {
         if (isInitial) {
@@ -29,6 +34,7 @@ export function useTokenVoting() {
           setTokens(transformedTokens);
           setLeaderboard(sortedTokens);
           setCurrentCrypto(sortedTokens[0]);
+          console.log(`[DEBUG] Set initial currentCrypto: ${sortedTokens[0]?.name}`);
         } else {
           setTokens(prev => [...prev, ...transformedTokens]);
           setLeaderboard(prev => {
@@ -43,7 +49,7 @@ export function useTokenVoting() {
       setIsLoading(false);
       setIsLoadingMore(false);
     } catch (error) {
-      console.error("Error fetching tokens:", error);
+      console.error("[DEBUG] Error fetching tokens:", error);
       setIsLoading(false);
       setIsLoadingMore(false);
     }

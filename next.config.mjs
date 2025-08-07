@@ -104,15 +104,9 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'dexscreener.com',
+        hostname: '*',
         port: '',
         pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'dd.dexscreener.com',
-        port: '',
-        pathname: '/ds-data/**',
       },
     ],
     unoptimized: false,

@@ -33,12 +33,12 @@ export function LeaderboardItem({
       onClick={() => onSelect(crypto)}
     >
       {/* Left Section */}
-      <div className="flex items-center gap-2 pl-2 w-[240px] flex-shrink-0">
+      <div className="flex items-center gap-2 pl-2 w-[240px] shrink-0">
         {/* Rank */}
-        <div className="text-gray-500 font-medium w-[28px] text-center flex-shrink-0">{`#${index + 1}`}</div>
+        <div className="text-gray-500 font-medium w-[28px] text-center shrink-0">{`#${index + 1}`}</div>
 
         {/* Profile Picture */}
-        <div className="w-8 h-8 bg-[#1A181C] rounded-lg overflow-hidden relative flex-shrink-0">
+        <div className="w-8 h-8 bg-[#1A181C] rounded-lg overflow-hidden relative shrink-0">
           <Image
             src={imageUrl}
             alt={`${crypto.name || 'Token'} logo`}
@@ -58,7 +58,7 @@ export function LeaderboardItem({
         </div>
 
         {/* Token Info */}
-        <div className="min-w-0 flex flex-col justify-center flex-grow">
+        <div className="min-w-0 flex flex-col justify-center grow">
           <div className="text-[#F5F5F5] font-medium truncate text-sm">{crypto.name}</div>
           <div className="text-gray-500 text-xs truncate">{crypto.symbol}</div>
         </div>
@@ -81,9 +81,9 @@ export function LeaderboardItem({
         >
           {view === "bullish" ? crypto.bullishPercentage : 100 - crypto.bullishPercentage}%
           {view === "bullish" ? (
-            <ArrowUpRight className="h-4 w-4 flex-shrink-0" strokeWidth={2.3} />
+            <ArrowUpRight className="h-4 w-4 shrink-0" strokeWidth={2.3} />
           ) : (
-            <ArrowDown className="h-4 w-4 flex-shrink-0" strokeWidth={2.3} />
+            <ArrowDown className="h-4 w-4 shrink-0" strokeWidth={2.3} />
           )}
         </div>
       </div>

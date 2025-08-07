@@ -176,6 +176,17 @@ export class DexScreenerClient {
     }
   }
 
+  async getPairsByTokenAddresses(tokenAddresses: string[], chainId: string = 'solana'): Promise<ExtendedPair[]> {
+    try {
+      // Dexscreener SDK's getPairsByTokenAddresses actually takes a single token address or a comma separated string of addresses
+      const response = await getPairsByTokenAddresses(chainId, tokenAddresses.join(','));
+      return response.map(pair => this.extendPair(pair));
+    } catch (error) {
+      console.error(`Failed to get pairs for tokens "${tokenAddresses.join(', ')}":`, error);
+      return [];
+    }
+  }
+
   async getPairsByPairAddress(pairAddress: string, chainId: string = 'solana'): Promise<ExtendedPair[]> {
     try {
       const response = await getPairById(chainId, pairAddress);
