@@ -1,9 +1,9 @@
-import type { Pair, PairsResponse, TokenProfile, TokenBoost } from 'dexscreener-sdk';
+import type { Pair, PairsResponse, TokenProfile } from 'dexscreener-sdk';
 
 export type { Pair as DexScreenerPair, PairsResponse as DexScreenerResponse };
 
 // Re-export additional types that might be useful
-export type { TokenProfile, TokenBoost };
+export type { TokenProfile };
 
 // Additional type for our specific use case
 export type ExtendedPair = Pair & {

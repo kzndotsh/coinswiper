@@ -14,16 +14,35 @@ export function useTokenVoting() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const fetchTokens = useCallback(async (pageNum: number, isInitial = false) => {
     console.log(`[DEBUG] fetchTokens called - page: ${pageNum}, isInitial: ${isInitial}`)
     try {
+      setError(null);
       setIsLoadingMore(!isInitial);
-      const response = await fetch(`/api/tokens/trending?sortBy=volume24h&sortOrder=desc&limit=30&page=${pageNum}`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      
+      const response = await fetch(`/api/tokens/trending?sortBy=volume24h&sortOrder=desc&limit=30&page=${pageNum}`, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       console.log(`[DEBUG] API response status: ${response.status}`)
-      if (!response.ok) throw new Error("Failed to fetch tokens");
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tokens: ${response.status} ${response.statusText}`);
+      }
+      
       const data = await response.json();
       console.log(`[DEBUG] API response data:`, data)
+      
+      if (!data.data || !Array.isArray(data.data)) {
+        throw new Error("Invalid response format");
+      }
       
       const transformedTokens = data.data.map(transformToken);
       console.log(`[DEBUG] Transformed ${transformedTokens.length} tokens`)
@@ -42,18 +61,29 @@ export function useTokenVoting() {
             return newList.sort((a, b) => b.bullishPercentage - a.bullishPercentage);
           });
         }
-        setHasMore(data.pagination.hasNextPage);
+        setHasMore(data.pagination?.hasNextPage ?? false);
+        setRetryCount(0); // Reset retry count on success
       } else {
         setHasMore(false);
       }
       setIsLoading(false);
       setIsLoadingMore(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[DEBUG] Error fetching tokens:", error);
+      setError(error.message || "Failed to load tokens");
       setIsLoading(false);
       setIsLoadingMore(false);
+      
+      // Auto-retry logic for initial load only
+      if (isInitial && retryCount < 3) {
+        const retryDelay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          fetchTokens(pageNum, isInitial);
+        }, retryDelay);
+      }
     }
-  }, []);
+  }, [retryCount]);
 
   const fetchRecentVotes = useCallback(async () => {
     try {
@@ -190,6 +220,7 @@ export function useTokenVoting() {
     hasMore,
     isLoadingMore,
     page,
+    error,
     setCurrentCrypto,
     onVote,
     onRedo,

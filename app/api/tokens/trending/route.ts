@@ -1,36 +1,48 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { VALIDATION_THRESHOLDS } from "@/lib/config/filters";
 
 // Cache for 5 minutes
-const CACHE_MAX_AGE = VALIDATION_THRESHOLDS.CACHE.MAX_AGE;
-const CACHE_STALE = VALIDATION_THRESHOLDS.CACHE.STALE_WHILE_REVALIDATE;
+const CACHE_MAX_AGE = 300;
+const CACHE_STALE = 600;
 
 export async function GET(request: Request) {
   console.log("[DEBUG] /api/tokens/trending called")
   try {
     const { searchParams } = new URL(request.url);
-    const sortBy = searchParams.get("sortBy") || "volume24h";
-    const sortOrder = searchParams.get("sortOrder") || "desc";
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 100);
-    const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
+    
+    // Validate and sanitize query parameters
+    const rawLimit = searchParams.get("limit");
+    const rawPage = searchParams.get("page");
+    
+    const limit = rawLimit 
+      ? Math.min(Math.max(parseInt(rawLimit, 10), 1), 50) // Min 1, max 50
+      : 50;
+      
+    const page = rawPage 
+      ? Math.max(parseInt(rawPage, 10), 1) // Min 1
+      : 1;
+    
+    if (isNaN(limit) || isNaN(page)) {
+      return new NextResponse("Invalid query parameters", { status: 400 });
+    }
+    
     const offset = (page - 1) * limit;
-    console.log(`[DEBUG] Query params: sortBy=${sortBy}, sortOrder=${sortOrder}, limit=${limit}, page=${page}`);
+    console.log(`[DEBUG] Query params: limit=${limit}, page=${page}`);
 
-    // Get total count and data in parallel
-    console.log(`[DEBUG] Querying DB with min liquidity: ${VALIDATION_THRESHOLDS.LIQUIDITY.MINIMAL}`)
+    // Simplified: just get tokens ordered by volume (top performing)
+    console.log(`[DEBUG] Querying DB for top tokens by volume`)
     const [total, tokens] = await Promise.all([
       db.cryptoCurrency.count({
         where: {
-          liquidity: { gte: VALIDATION_THRESHOLDS.LIQUIDITY.MINIMAL }
+          liquidity: { gte: 1000 } // Minimum $1000 liquidity
         }
       }),
       db.cryptoCurrency.findMany({
         where: {
-          liquidity: { gte: VALIDATION_THRESHOLDS.LIQUIDITY.MINIMAL }
+          liquidity: { gte: 1000 } // Minimum $1000 liquidity
         },
         orderBy: {
-          [sortBy]: sortOrder,
+          volume24h: 'desc', // Always sort by volume descending
         },
         take: limit,
         skip: offset,
@@ -82,10 +94,22 @@ export async function GET(request: Request) {
       },
       debug: {
         filteredTokens: tokens.length,
+        sortedBy: "volume24h_desc"
       }
     }, { headers });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[DEBUG] Error fetching trending tokens:", error);
-    return new NextResponse("Internal error", { status: 500 });
+    
+    // Handle specific database errors
+    if (error?.code === 'P2002') {
+      return new NextResponse("Database constraint error", { status: 409 });
+    }
+    
+    if (error?.code === 'P2025') {
+      return new NextResponse("Record not found", { status: 404 });
+    }
+    
+    // Generic server error
+    return new NextResponse("Failed to fetch tokens", { status: 500 });
   }
 } 

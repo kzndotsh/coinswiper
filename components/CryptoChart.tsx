@@ -172,18 +172,20 @@ const CryptoChart = memo(function CryptoChart({ pairAddress }: CryptoChartProps)
       
       // Handle iframe load
       iframe.onload = () => {
-        setIsLoaded(true);
-        const container = containerRef.current;
-        if (iframe.contentWindow && container) {
-          const rect = container.getBoundingClientRect();
-          iframe.contentWindow.postMessage({
-            name: 'resize',
-            size: {
-              width: rect.width,
-              height: rect.height
-            }
-          }, '*');
-        }
+        requestAnimationFrame(() => {
+          setIsLoaded(true);
+          const container = containerRef.current;
+          if (iframe.contentWindow && container) {
+            const rect = container.getBoundingClientRect();
+            iframe.contentWindow.postMessage({
+              name: 'resize',
+              size: {
+                width: rect.width,
+                height: rect.height
+              }
+            }, '*');
+          }
+        });
       };
 
       iframe.src = buildEmbedUrl(pairAddress);

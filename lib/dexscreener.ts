@@ -1,8 +1,6 @@
-import type { DexScreenerResponse, DexScreenerPair, ExtendedPair, TokenProfile, TokenBoost } from "@/types/dexscreener";
+import type { ExtendedPair, TokenProfile } from "@/types/dexscreener";
 import {
   getLatestTokenProfiles,
-  getLatestTokenBoosts,
-  getTopTokenBoosts,
   getPairById,
   searchPairs,
   getTokenPools,
@@ -10,8 +8,6 @@ import {
   type Pair,
   type PairsResponse
 } from "dexscreener-sdk";
-
-import { VALIDATION_THRESHOLDS, SOLANA_DEXES } from "@/lib/config/filters";
 
 const DEXSCREENER_API_BASE = "https://api.dexscreener.com/latest/dex";
 
@@ -34,33 +30,118 @@ export class DexScreenerClient {
 
   async getTrendingPairs(chainId: string = 'solana'): Promise<ExtendedPair[]> {
     try {
-      console.log('Fetching trending pairs from Solana...');
-      // Search for trending pairs on Solana with minimum liquidity
-      const response = await searchPairs(`chain:${chainId} liquidity:${VALIDATION_THRESHOLDS.LIQUIDITY.TRENDING_PAIRS}`);
-      const pairs = response.pairs || [];
-      console.log(`Found ${pairs.length} trending pairs`);
+      console.log('Fetching top tokens by volume from Solana...');
+      
+      const allPairs: any[] = [];
+      
+      // Strategy 1: Get trending tokens 
+      try {
+        console.log('Strategy 1: Trending tokens...');
+        const response = await fetch('https://api.dexscreener.com/latest/dex/search/?q=trending', {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; CoinSwiper/1.0)',
+            'Accept': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.pairs && Array.isArray(data.pairs)) {
+            const solanaPairs = data.pairs.filter((pair: any) => pair.chainId === 'solana');
+            console.log(`Found ${solanaPairs.length} trending Solana pairs`);
+            allPairs.push(...solanaPairs);
+          }
+        }
+      } catch (error) {
+        console.log('Trending search failed:', error);
+      }
 
-      // Filter for valid pairs and sort by volume
-      const filteredPairs = pairs
-        .filter((pair: Pair) => {
-          const isValidChain = pair.chainId === chainId;
-          const hasMinLiquidity = Number(pair.liquidity?.usd || 0) >= VALIDATION_THRESHOLDS.LIQUIDITY.TRENDING_PAIRS;
-          const isValidDex = SOLANA_DEXES.includes(pair.dexId.toLowerCase());
+      // Strategy 2: Get pairs for major Solana tokens
+      const majorTokens = [
+        'So11111111111111111111111111111111111111112', // SOL
+      ];
+      
+      console.log('Strategy 2: Major token pairs...');
+      for (const tokenAddress of majorTokens) {
+        try {
+          const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; CoinSwiper/1.0)',
+              'Accept': 'application/json',
+            }
+          });
           
-          if (!isValidChain) console.log(`Skipping pair ${pair.baseToken?.symbol}: wrong chain`);
-          if (!hasMinLiquidity) console.log(`Skipping pair ${pair.baseToken?.symbol}: insufficient liquidity`);
-          if (!isValidDex) console.log(`Skipping pair ${pair.baseToken?.symbol}: invalid DEX`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.pairs && Array.isArray(data.pairs)) {
+              const solanaPairs = data.pairs.filter((pair: any) => pair.chainId === 'solana');
+              console.log(`Found ${solanaPairs.length} pairs for ${tokenAddress.slice(0, 8)}...`);
+              allPairs.push(...solanaPairs);
+            }
+          }
           
-          return isValidChain && hasMinLiquidity && isValidDex;
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+          console.log(`Failed to fetch pairs for ${tokenAddress.slice(0, 8)}...:`, error);
+        }
+      }
+      
+      // Strategy 3: Search by popular terms
+      const searchTerms = ['USDC', 'SOL', 'RAY', 'ORCA', 'BONK', 'JUP'];
+      console.log('Strategy 3: Search terms...');
+      for (const term of searchTerms) {
+        try {
+          const response = await fetch(`https://api.dexscreener.com/latest/dex/search/?q=${term}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; CoinSwiper/1.0)',
+              'Accept': 'application/json',
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.pairs && Array.isArray(data.pairs)) {
+              const solanaPairs = data.pairs.filter((pair: any) => pair.chainId === 'solana');
+              console.log(`Found ${solanaPairs.length} pairs for search "${term}"`);
+              allPairs.push(...solanaPairs);
+            }
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+          console.log(`Failed to search for "${term}":`, error);
+        }
+      }
+
+      console.log(`Total pairs found: ${allPairs.length}`);
+
+      // Deduplicate by pairAddress
+      const uniquePairs = Array.from(
+        new Map(allPairs.map(pair => [pair.pairAddress, pair])).values()
+      );
+      
+      console.log(`Unique pairs after deduplication: ${uniquePairs.length}`);
+
+      // Filter and sort by volume - more permissive now
+      const filteredPairs = uniquePairs
+        .filter((pair: any) => {
+          const hasValidChain = pair.chainId === 'solana';
+          const hasMinLiquidity = Number(pair.liquidity?.usd || 0) >= 50; // Lower threshold
+          const hasValidTokens = pair.baseToken?.address && pair.quoteToken?.address;
+          
+          if (!hasValidChain) console.log(`Filtered out ${pair.baseToken?.symbol}: wrong chain ${pair.chainId}`);
+          if (!hasMinLiquidity) console.log(`Filtered out ${pair.baseToken?.symbol}: low liquidity $${pair.liquidity?.usd}`);
+          if (!hasValidTokens) console.log(`Filtered out ${pair.baseToken?.symbol}: missing token addresses`);
+          
+          return hasValidChain && hasMinLiquidity && hasValidTokens;
         })
-        .sort((a, b) => Number(b.volume?.h24 || 0) - Number(a.volume?.h24 || 0))
-        .map(pair => this.extendPair(pair));
+        .sort((a: any, b: any) => Number(b.volume?.h48 || b.volume?.h24 || 0) - Number(a.volume?.h48 || a.volume?.h24 || 0))
+        .slice(0, 200) // Take top 200 to have plenty
+        .map(pair => this.extendPair(pair as Pair));
 
-      console.log(`Filtered to ${filteredPairs.length} valid trending pairs`);
-      filteredPairs.forEach((pair: ExtendedPair) => {
-        console.log(`- ${pair.baseToken?.symbol} (${pair.dexId}): $${pair.liquidity?.usd || 0} liquidity, $${pair.volume?.h24 || 0} 24h volume`);
-      });
-
+      console.log(`Filtered to top ${filteredPairs.length} pairs by volume`);
+      
       return filteredPairs;
     } catch (error) {
       console.error(`Failed to get trending pairs:`, error);
@@ -68,89 +149,6 @@ export class DexScreenerClient {
     }
   }
 
-  async getNewPairs(chainId: string = 'solana'): Promise<ExtendedPair[]> {
-    try {
-      console.log('Fetching new pairs from Solana...');
-      // Search for new pairs on Solana with minimum liquidity
-      const response = await searchPairs(`chain:${chainId} new liquidity:${VALIDATION_THRESHOLDS.LIQUIDITY.NEW_PAIRS}`);
-      const pairs = response.pairs || [];
-      console.log(`Found ${pairs.length} new pairs`);
-
-      // Filter for valid pairs and sort by creation date
-      const filteredPairs = pairs
-        .filter((pair: Pair) => {
-          const isValidChain = pair.chainId === chainId;
-          const hasMinLiquidity = Number(pair.liquidity?.usd || 0) >= VALIDATION_THRESHOLDS.LIQUIDITY.NEW_PAIRS;
-          const isValidDex = SOLANA_DEXES.includes(pair.dexId.toLowerCase());
-          
-          if (!isValidChain) console.log(`Skipping pair ${pair.baseToken?.symbol}: wrong chain`);
-          if (!hasMinLiquidity) console.log(`Skipping pair ${pair.baseToken?.symbol}: insufficient liquidity`);
-          if (!isValidDex) console.log(`Skipping pair ${pair.baseToken?.symbol}: invalid DEX`);
-          
-          return isValidChain && hasMinLiquidity && isValidDex;
-        })
-        .sort((a, b) => new Date(b.pairCreatedAt).getTime() - new Date(a.pairCreatedAt).getTime())
-        .map(pair => this.extendPair(pair));
-
-      console.log(`Filtered to ${filteredPairs.length} valid new pairs`);
-      filteredPairs.forEach((pair: ExtendedPair) => {
-        console.log(`- ${pair.baseToken?.symbol} (${pair.dexId}): $${pair.liquidity?.usd || 0} liquidity, created ${new Date(pair.pairCreatedAt).toISOString()}`);
-      });
-
-      return filteredPairs;
-    } catch (error) {
-      console.error(`Failed to get new pairs:`, error);
-      return [];
-    }
-  }
-
-  async searchPairs(dex: string): Promise<ExtendedPair[]> {
-    try {
-      // Try alternative DEX identifiers for PumpFun
-      const dexId = dex.toLowerCase() === 'pumpfun' ? 'pump' : dex.toLowerCase();
-      
-      console.log(`\nSearching pairs for ${dex}...`);
-      // Search for pairs with minimum liquidity
-      const searchQuery = `chain:solana dex:${dexId} liquidity:${VALIDATION_THRESHOLDS.LIQUIDITY.DEX_PAIRS}`;
-      console.log(`Search query: "${searchQuery}"`);
-      
-      const response = await searchPairs(searchQuery);
-      
-      // Log raw response
-      const pairs = response.pairs || [];
-      console.log(`Raw results: ${pairs.length} pairs`);
-      
-      if (pairs.length === 0) {
-        // Log the full response for debugging
-        console.log('Full response:', JSON.stringify(response, null, 2));
-      }
-      
-      // Log all unique DEX IDs found
-      const uniqueDexIds = new Set(pairs.map(p => p.dexId.toLowerCase()));
-      console.log('Found DEX IDs:', Array.from(uniqueDexIds));
-      
-      // Filter for Solana pairs and log details
-      const solanaPairs = pairs
-        .filter((pair: Pair) => {
-          const isDexMatch = pair.dexId.toLowerCase() === dexId;
-          if (isDexMatch) {
-            console.log(`Found matching DEX ID: ${pair.dexId} (looking for ${dexId})`);
-          }
-          return pair.chainId === 'solana' && isDexMatch;
-        })
-        .map(pair => this.extendPair(pair));
-
-      console.log(`Filtered to ${solanaPairs.length} Solana pairs on ${dex}:`);
-      solanaPairs.forEach((pair: ExtendedPair) => {
-        console.log(`- ${pair.baseToken?.symbol} (${pair.dexId}): $${pair.liquidity?.usd || 0} liquidity, created ${new Date(pair.pairCreatedAt).toISOString()}`);
-      });
-      
-      return solanaPairs;
-    } catch (error) {
-      console.error(`Failed to search pairs for "${dex}":`, error);
-      return [];
-    }
-  }
 
   async searchTokens(query: string): Promise<ExtendedPair[]> {
     try {
@@ -237,22 +235,6 @@ export class DexScreenerClient {
     }
   }
 
-  // New method to get token boosts
-  async getTokenBoosts(chainId: string = 'solana'): Promise<TokenBoost[]> {
-    try {
-      const [latestBoosts, topBoosts] = await Promise.all([
-        getLatestTokenBoosts(),
-        getTopTokenBoosts()
-      ]);
-      
-      // Combine and filter for Solana tokens
-      const allBoosts = [...latestBoosts, ...topBoosts];
-      return allBoosts.filter(boost => boost.chainId === chainId);
-    } catch (error) {
-      console.error(`Failed to get token boosts:`, error);
-      return [];
-    }
-  }
 
   getTradingViewChartUrl(pairAddress: string, chainId: string): string {
     return `https://dexscreener.com/chart/${chainId}/${pairAddress}`;

@@ -3,8 +3,27 @@ import { db } from "@/lib/db";
 import { inter, helvetica } from './fonts'
 
 export const metadata = {
-  title: "CoinSwiper",
-  description: "Vote on your favorite cryptocurrencies",
+  title: "CoinSwiper - Vote on Top Crypto Tokens",
+  description: "Discover and vote on the top 50 trending cryptocurrency tokens by volume. Real-time charts, community sentiment, and live voting on Solana tokens.",
+  keywords: "cryptocurrency, crypto voting, solana tokens, trending crypto, dex tokens, crypto sentiment",
+  authors: [{ name: "CoinSwiper" }],
+  robots: "index, follow",
+  openGraph: {
+    title: "CoinSwiper - Vote on Top Crypto Tokens",
+    description: "Discover and vote on the top 50 trending cryptocurrency tokens by volume",
+    type: "website",
+    siteName: "CoinSwiper",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CoinSwiper - Vote on Top Crypto Tokens",
+    description: "Discover and vote on the top 50 trending cryptocurrency tokens by volume",
+  },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 async function initializeIfNeeded() {
@@ -13,21 +32,35 @@ async function initializeIfNeeded() {
     const count = await db.cryptoCurrency.count();
     console.log(`[DEBUG] DB has ${count} crypto currencies`)
     
-    if (count === 0) {
-      console.log("[DEBUG] No data found, triggering initial sync...");
+    // Get the timestamp of the most recent token
+    const lastUpdated = await db.cryptoCurrency.findFirst({
+      orderBy: { updatedAt: 'desc' },
+      select: { updatedAt: true }
+    });
+    
+    const shouldSync = count < 30 || // Always sync if we have fewer than 30 tokens
+      !lastUpdated || 
+      Date.now() - lastUpdated.updatedAt.getTime() > 15 * 60 * 1000; // 15 minutes
+    
+    if (shouldSync) {
+      console.log("[DEBUG] Triggering background sync...");
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      console.log(`[DEBUG] Calling sync API at: ${baseUrl}/api/sync/trending`)
       
-      const response = await fetch(`${baseUrl}/api/sync/trending`, {
+      // Don't await - let it run in background
+      fetch(`${baseUrl}/api/sync/trending`, {
         method: "POST",
         cache: "no-store",
+      }).then(response => {
+        if (response.ok) {
+          console.log("[DEBUG] Background sync completed successfully")
+        } else {
+          console.error("[DEBUG] Background sync failed")
+        }
+      }).catch(error => {
+        console.error("[DEBUG] Background sync error:", error)
       });
-
-      if (!response.ok) {
-        console.error("[DEBUG] Failed to sync:", await response.text());
-      } else {
-        console.log("[DEBUG] Initial sync completed successfully")
-      }
+    } else {
+      console.log("[DEBUG] Data is recent, skipping sync")
     }
   } catch (error) {
     console.error("[DEBUG] Error in initializeIfNeeded:", error)

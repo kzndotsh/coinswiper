@@ -6,29 +6,15 @@ import type { ExtendedPair } from "@/types/dexscreener";
 import {
   SOLANA_DEXES,
   VALIDATION_THRESHOLDS,
-  type ValidationResult,
   isSuspiciousToken,
-  calculatePairScore,
-  DEX_CONFIG,
-  isNewEnough,
+  isInfrastructureToken,
 } from "@/lib/config/filters";
 
 export async function POST() {
   try {
-    console.log("[DEBUG] Starting sync process...");
+    console.log("[DEBUG] Starting simplified sync process for top 50 tokens...");
     
-    const hardcodedAddresses = [
-      "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
-      "H1aoUqmp2vJu5o8w3o8LjrN6jKyWErS69PtYxGhfoXxf",
-      "ENfpbQUM5xAnNP8ecyEQGFJ6KwbuPjMwv7ZjR29cDuAb",
-      "8V6pDEmXV3iKC3nVjDUeDqMPBrTq8y69EovCxTokyyFd",
-      "fRfKGCriduzDwSudCwpL7ySCEiboNuryhZDVJtr1a1C",
-      "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
-      "38PgzpJYu2HkiYvV8qePFakB8tuobPdGm2FFEn7Dpump",
-      "GkyPYa7NnCFbduLknCfBfP7p8564X1VZhwZYJ6CZpump",
-      "FtUEW73K6vEYHfbkfpdBZfWpxgQar2HipGdbutEhpump",
-      "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
-    ];
+    // Remove hardcoded addresses - we'll fetch top tokens dynamically
 
     // Test database connection
     let count = 0;
@@ -55,42 +41,18 @@ export async function POST() {
       throw error;
     }
 
-    // Search for trending pairs from each DEX
-    console.log("Fetching trending pairs...");
+    // Get top tokens by volume - much simpler approach
+    console.log("Fetching top tokens by volume...");
     const allPairs: ExtendedPair[] = [];
     
-    // Fetch pairs using hardcoded addresses
-    console.log("Fetching pairs from hardcoded list...");
-    const hardcodedPairs = await dexscreener.getPairsByTokenAddresses(hardcodedAddresses);
-    console.log(`Found ${hardcodedPairs.length} pairs from hardcoded list`);
-    allPairs.push(...hardcodedPairs);
-
-    // Comment out or remove other fetching methods if only hardcoded list is needed
-    /*
-    // Get trending pairs by volume
+    // Get trending pairs by volume (this is the main source)
     console.log("Fetching trending pairs from Solana...");
     const trendingPairs = await dexscreener.getTrendingPairs();
     console.log(`Found ${trendingPairs.length} trending pairs`);
     allPairs.push(...trendingPairs);
 
-    // Get new pairs by creation date
-    console.log("Fetching new pairs from Solana...");
-    const newPairs = await dexscreener.getNewPairs();
-    console.log(`Found ${newPairs.length} new pairs`);
-    allPairs.push(...newPairs);
-
-    // Search for pairs from each DEX
-    for (const dex of SOLANA_DEXES) {
-      console.log(`\nFetching pairs from ${dex}...`);
-      const dexPairs = await dexscreener.searchPairs(dex);
-      console.log(`Found ${dexPairs.length} pairs on ${dex}`);
-      allPairs.push(...dexPairs);
-    }
-    */
-
-    // Get token boosts to prioritize promoted tokens
-    const boostedTokens = await dexscreener.getTokenBoosts();
-    const boostedAddresses = new Set(boostedTokens.map(boost => boost.tokenAddress));
+    // No need for token boosts in simplified version
+    const boostedAddresses = new Set<string>();
     
     // Deduplicate pairs by pairAddress
     const uniquePairs = Array.from(
@@ -99,72 +61,53 @@ export async function POST() {
     
     console.log(`Found ${uniquePairs.length} total unique pairs before validation`);
 
-    // First pass: Group pairs by baseToken symbol and dexId
-    const pairsBySymbolAndDex = new Map<string, ExtendedPair[]>();
-    uniquePairs.forEach(pair => {
-      const key = `${pair.baseToken?.symbol}-${pair.dexId}`;
-      const existing = pairsBySymbolAndDex.get(key) || [];
-      existing.push(pair);
-      pairsBySymbolAndDex.set(key, existing);
-    });
+    // Sort by 48h volume (fallback to 24h if 48h not available)
+    const sortedPairs = uniquePairs
+      .sort((a, b) => Number(b.volume?.h48 || b.volume?.h24 || 0) - Number(a.volume?.h48 || a.volume?.h24 || 0))
+      .slice(0, 50); // Take only top 50
 
-    // Keep only the highest liquidity pair for each symbol-dex combination
-    const dedupedPairs = Array.from(pairsBySymbolAndDex.values()).map(pairs => 
-      pairs.reduce((highest, current) => 
-        (current.liquidity?.usd || 0) > (highest.liquidity?.usd || 0) ? current : highest
-      )
-    );
+    console.log(`Selected top ${sortedPairs.length} pairs by 48h volume`);
 
-    console.log(`Found ${dedupedPairs.length} pairs after deduplication`);
-
-    // Validate pairs
-    const pairValidations = dedupedPairs.map((pair) => {
-      // Validate the pair
+    // Simplified validation - just basic checks
+    const pairValidations = sortedPairs.map((pair) => {
       const validation = {
         isOnSolana: pair.chainId === 'solana',
         isValidDex: SOLANA_DEXES.includes(pair.dexId.toLowerCase()),
         hasValidTokens: Boolean(pair.baseToken?.address && pair.quoteToken?.address),
         hasMinimalLiquidity: Number(pair.liquidity?.usd || 0) >= VALIDATION_THRESHOLDS.LIQUIDITY.MINIMAL,
-        isNew: isNewEnough(new Date(Number(pair.pairCreatedAt)), pair.dexId),
         isSuspicious: isSuspiciousToken(pair.baseToken?.symbol || '', pair.quoteToken?.symbol || ''),
-        isTokenBoosted: false, // Will be set later
-        isValid: false, // Will be set after all checks
-        liquidity: Number(pair.liquidity?.usd || 0),
-        createdAt: Number(pair.pairCreatedAt)
+        isInfrastructure: isInfrastructureToken(pair.baseToken?.symbol || '', pair.baseToken?.name || ''),
+        isValid: false
       };
 
-      // Log validation details
-      console.log(`Validating pair ${pair.baseToken?.symbol}/${pair.quoteToken?.symbol} on ${pair.dexId}:`, {
-        ...validation,
-        createdAt: new Date(validation.createdAt).toISOString()
-      });
+      // Log why tokens are being filtered out
+      if (!validation.isOnSolana) console.log(`❌ ${pair.baseToken?.symbol}: wrong chain`);
+      if (!validation.isValidDex) console.log(`❌ ${pair.baseToken?.symbol}: invalid dex ${pair.dexId}`);
+      if (!validation.hasValidTokens) console.log(`❌ ${pair.baseToken?.symbol}: missing token addresses`);
+      if (!validation.hasMinimalLiquidity) console.log(`❌ ${pair.baseToken?.symbol}: low liquidity $${pair.liquidity?.usd}`);
+      if (validation.isSuspicious) console.log(`❌ ${pair.baseToken?.symbol}: suspicious token`);
+      if (validation.isInfrastructure) console.log(`❌ ${pair.baseToken?.symbol}: infrastructure token (${pair.baseToken?.name})`);
 
-      // Get token boost status
-      const isTokenBoosted = boostedTokens.some(
-        (token) => token.tokenAddress === pair.baseToken?.address
-      );
-
-      // A pair is valid if:
-      // 1. It's on Solana
-      // 2. It's from a valid DEX
-      // 3. Has valid tokens
-      // 4. Has minimal liquidity
-      // 5. Is not suspicious
-      // 6. Is either new OR boosted
-      validation.isTokenBoosted = isTokenBoosted;
+      // Allow all tokens except suspicious ones (no infrastructure filtering)
       validation.isValid = 
         validation.isOnSolana &&
         validation.isValidDex &&
         validation.hasValidTokens &&
         validation.hasMinimalLiquidity &&
-        !validation.isSuspicious &&
-        (validation.isNew || validation.isTokenBoosted);
+        !validation.isSuspicious;
+
+      if (validation.isValid) {
+        const volume48h = Number(pair.volume?.h48 || 0);
+        const volume24h = Number(pair.volume?.h24 || 0);
+        const displayVolume = volume48h > 0 ? volume48h : volume24h;
+        const timeframe = volume48h > 0 ? "48h" : "24h";
+        console.log(`✅ ${pair.baseToken?.symbol}: VALID token (${timeframe} volume: $${displayVolume.toLocaleString()})`);
+      }
 
       return {
         pair,
         isValid: validation.isValid,
-        creationDate: new Date(validation.createdAt),
-        score: calculatePairScore(pair, boostedAddresses.has(pair.baseToken.address))
+        score: Number(pair.volume?.h48 || pair.volume?.h24 || 0) // Use 48h volume as score
       };
     });
 
@@ -177,12 +120,26 @@ export async function POST() {
       Invalid Pairs: ${totalPairs - validPairCount}
     `);
 
-    // Filter valid pairs and sort by score
-    const validPairs = pairValidations
-      .filter((result) => result.isValid)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, VALIDATION_THRESHOLDS.LIMITS.MAX_PAIRS)
+    // Filter valid pairs and deduplicate by base token
+    const validPairResults = pairValidations.filter((result) => result.isValid);
+    
+    // Deduplicate by base token address, keeping the highest volume pair for each token
+    const uniqueTokenMap = new Map<string, any>();
+    validPairResults.forEach((result) => {
+      const tokenAddress = result.pair.baseToken.address;
+      const existing = uniqueTokenMap.get(tokenAddress);
+      
+      if (!existing || result.score > existing.score) {
+        uniqueTokenMap.set(tokenAddress, result);
+      }
+    });
+    
+    const validPairs = Array.from(uniqueTokenMap.values())
+      .sort((a, b) => b.score - a.score) // Sort by volume
+      .slice(0, 50) // Keep top 50 unique tokens
       .map((result) => result.pair);
+    
+    console.log(`After deduplication: ${validPairs.length} unique tokens`);
 
     // Log final results
     console.log(`\nFinal Results:
@@ -199,14 +156,8 @@ export async function POST() {
           // Get token profile if available
           const tokenProfile = await dexscreener.getTokenProfile(pair.baseToken.address);
           
-          const isBoosted = boostedAddresses.has(pair.baseToken.address);
-          const score = calculatePairScore({
-            volume24h: Number(pair.volume?.h24 || 0),
-            liquidityUsd: Number(pair.liquidity?.usd || 0),
-            txCount24h: Number((pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0)),
-            priceChange24h: Number(pair.priceChange?.h24 || 0),
-            isBoosted: isBoosted,
-          });
+          // Simplified scoring - just use volume
+          const score = Number(pair.volume?.h24 || 0);
 
           // Convert numeric values to match database schema types
           const data = {
@@ -223,7 +174,7 @@ export async function POST() {
             priceSOL: pair.priceNative || "0",
             // Convert to numbers for database
             liquidity: Number(pair.liquidity?.usd || 0),
-            volume24h: Number(pair.volume?.h24 || 0),
+            volume24h: Number(pair.volume?.h48 || pair.volume?.h24 || 0), // Use 48h volume
             marketCap: Number(pair.marketCap || 0),
             fdv: Number(pair.fdv || 0),
             priceChange24h: Number(pair.priceChange?.h24 || 0),
@@ -235,8 +186,7 @@ export async function POST() {
             // Initialize vote counts
             bullishVotes: 0,
             bearishVotes: 0,
-            bullishPercentage: 50,
-            score: score
+            bullishPercentage: 50
           };
 
           return await db.cryptoCurrency.upsert({
@@ -246,7 +196,7 @@ export async function POST() {
           });
         } catch (error: any) {
           // Log specific error details for Prisma errors
-          if (error instanceof Prisma.PrismaClientKnownRequestError) {
+          if (error?.code && typeof error.code === 'string') {
             console.error(`Prisma error upserting pair ${pair.pairAddress}:`, {
               code: error.code,
               message: error.message,
@@ -271,7 +221,7 @@ export async function POST() {
 
     // Add caching headers
     const headers = new Headers({
-      'Cache-Control': `public, s-maxage=${VALIDATION_THRESHOLDS.CACHE.MAX_AGE}, stale-while-revalidate=${VALIDATION_THRESHOLDS.CACHE.STALE_WHILE_REVALIDATE}`,
+      'Cache-Control': `public, s-maxage=300, stale-while-revalidate=600`,
     });
 
     return NextResponse.json({
@@ -282,33 +232,27 @@ export async function POST() {
         dexId: pair.dexId,
         baseToken: pair.baseToken.symbol,
         quoteToken: pair.quoteToken.symbol,
-        volume24h: pair.volume?.h24 || 0,
+        volume24h: pair.volume?.h48 || pair.volume?.h24 || 0, // 48h volume
         liquidity: pair.liquidity?.usd || 0,
         priceUsd: pair.priceUsd || "0",
         priceChange24h: pair.priceChange?.h24 || 0,
-        isBoosted: boostedAddresses.has(pair.baseToken.address),
-        score: calculatePairScore({
-          volume24h: Number(pair.volume?.h24 || 0),
-          liquidityUsd: Number(pair.liquidity?.usd || 0),
-          txCount24h: Number((pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0)),
-          priceChange24h: Number(pair.priceChange?.h24 || 0),
-          isBoosted: boostedAddresses.has(pair.baseToken.address),
-        })
+        isBoosted: false,
+        score: Number(pair.volume?.h48 || pair.volume?.h24 || 0)
       })),
     }, { headers });
   } catch (error: any) {
     console.error("Trending sync error:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error?.code && typeof error.code === 'string') {
       console.error("Known Prisma error:", {
         code: error.code,
         message: error.message,
         clientVersion: error.clientVersion,
       });
       return new NextResponse(`Prisma error: ${error.message}`, { status: 500 });
-    } else if (error instanceof Prisma.PrismaClientValidationError) {
+    } else if (error?.message && error.message.includes('validation')) {
       console.error("Validation error:", error.message);
       return new NextResponse(`Validation error: ${error.message}`, { status: 400 });
-    } else if (error instanceof Error) {
+    } else if (error?.message) {
       console.error("General error:", error.message);
       return new NextResponse(`Error: ${error.message}`, { status: 500 });
     }
